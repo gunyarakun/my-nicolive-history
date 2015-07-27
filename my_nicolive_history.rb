@@ -26,7 +26,7 @@ def get_nicovideo_logined_mechanize(email, password)
   m
 end
 
-def get_all_my_live_urls(m)
+def get_all_my_live_ids(m)
   page = m.get('http://live.nicovideo.jp/my', [], m.page.uri, {
     'Accept-Language' => 'ja' # if accept-language doesn't contain 'ja', mypage doesn't contain 月別リンク
   })
@@ -34,7 +34,7 @@ def get_all_my_live_urls(m)
 
   mypage_urls.map {|url|
     page_no = 0
-    monthly_live_urls = []
+    monthly_live_ids = []
     loop {
       $stderr.puts "Fetch live urls from url: #{url} page: #{page_no}"
       page = m.get("#{url}&page=#{page_no}")
@@ -42,20 +42,22 @@ def get_all_my_live_urls(m)
       if live_urls.length == 0
         break
       end
-      monthly_live_urls += live_urls
+      live_ids = live_urls.map {|live_url|
+        live_url.match(/lv\d+/)[0]
+      }
+      monthly_live_ids += live_ids
       page_no += 1
     }
 
     sleep 2.525
 
-    monthly_live_urls
+    monthly_live_ids
   }.flatten.sort{|a, b| a[2..-1].to_i <=> b[2..-1].to_i}
 end
 
-def get_information_from_live_urls(m, live_urls)
+def get_information_from_live_ids(m, live_ids)
   sequence_number = 1
-  live_urls.map {|live_url|
-    live_id = live_url.match(/lv\d+/)[0]
+  live_ids.map {|live_id|
     $stderr.puts "Fetch live information for #{live_id}"
     live_watch_url = "http://live.nicovideo.jp/watch/#{live_id}"
     page = m.get(live_watch_url, [], m.page.uri, {
@@ -78,8 +80,8 @@ def get_information_from_live_urls(m, live_urls)
         :open_time => video_response['open_time'],
         :start_time => video_response['start_time'],
         :end_time => video_response['end_time'],
-        :view_counter => video_response['view_counter'],
-        :comment_count => video_response['comment_count'],
+        :view_counter => video_response['view_counter'].to_i, # it works if you are not famous namamushi
+        :comment_count => video_response['comment_count'].to_i, # it works if you are not famous namamushi
       }
     else
       # Closed page
@@ -140,8 +142,8 @@ def main
   end
 
   m = get_nicovideo_logined_mechanize(*ARGV)
-  live_urls = get_all_my_live_urls(m)
-  live_information = get_information_from_live_urls(m, live_urls)
+  live_ids = get_all_my_live_ids(m)
+  live_information = get_information_from_live_ids(m, live_ids)
   output_json(live_information)
 end
 
